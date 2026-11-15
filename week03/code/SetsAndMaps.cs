@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Http;
 using System.Text.Json;
 
 public static class SetsAndMaps
@@ -22,7 +26,32 @@ public static class SetsAndMaps
     public static string[] FindPairs(string[] words)
     {
         // TODO Problem 1 - ADD YOUR CODE HERE
-        return [];
+        var wordSet = new HashSet<string>(words);
+        var matchedWords = new HashSet<string>();
+        var pairs = new List<string>();
+
+        foreach (var word in words)
+        {
+        // Ignore words with identical letters, such as "aa".
+        if (word[0] == word[1] || matchedWords.Contains(word))
+        {
+            continue;
+        }
+
+        // Reverse the two letters.
+        string reversedWord = $"{word[1]}{word[0]}";
+
+        // Check whether the reversed word exists.
+        if (wordSet.Contains(reversedWord))
+        {
+            pairs.Add($"{word} & {reversedWord}");
+
+            // Prevent the same pair from being returned twice.
+            matchedWords.Add(word);
+            matchedWords.Add(reversedWord);
+        }
+        }
+        return pairs.ToArray();
     }
 
     /// <summary>
@@ -43,6 +72,16 @@ public static class SetsAndMaps
         {
             var fields = line.Split(",");
             // TODO Problem 2 - ADD YOUR CODE HERE
+            var degree = fields[3].Trim();
+
+            if (degrees.ContainsKey(degree))
+            {
+                degrees[degree]++;
+            }
+            else
+            {
+                degrees.Add(degree, 1);
+            }
         }
 
         return degrees;
@@ -67,7 +106,61 @@ public static class SetsAndMaps
     public static bool IsAnagram(string word1, string word2)
     {
         // TODO Problem 3 - ADD YOUR CODE HERE
-        return false;
+        var letterCounts = new Dictionary<char, int>();
+
+        // Count the letters in the first word.
+    foreach (char letter in word1)
+        {
+        if (char.IsWhiteSpace(letter))
+            {
+                continue;
+            }
+
+        char normalizedLetter = char.ToUpperInvariant(letter);
+
+        if (letterCounts.ContainsKey(normalizedLetter))
+            {
+                letterCounts[normalizedLetter]++;
+            }
+        else
+            {
+                letterCounts.Add(normalizedLetter, 1);
+            }
+        }
+
+     // Subtract the letters found in the second word.
+    foreach (char letter in word2)
+    {
+        if (char.IsWhiteSpace(letter))
+            {
+                continue;
+            }
+
+        char normalizedLetter = char.ToUpperInvariant(letter);
+
+        if (!letterCounts.ContainsKey(normalizedLetter))
+            {
+                return false;
+            }
+
+        letterCounts[normalizedLetter]--;
+
+        if (letterCounts[normalizedLetter] < 0)
+            {
+                return false;
+            }
+    }
+
+    // All letter counts must be zero.
+    foreach (var count in letterCounts.Values)
+        {
+        if (count != 0)
+            {
+            return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -88,10 +181,9 @@ public static class SetsAndMaps
     {
         const string uri = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson";
         using var client = new HttpClient();
-        using var getRequestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-        using var jsonStream = client.Send(getRequestMessage).Content.ReadAsStream();
-        using var reader = new StreamReader(jsonStream);
-        var json = reader.ReadToEnd();
+        using var response = client.GetAsync(uri).GetAwaiter().GetResult();
+        response.EnsureSuccessStatusCode();
+        var json = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
         var featureCollection = JsonSerializer.Deserialize<FeatureCollection>(json, options);
@@ -101,6 +193,21 @@ public static class SetsAndMaps
         // on those classes so that the call to Deserialize above works properly.
         // 2. Add code below to create a string out each place a earthquake has happened today and its magitude.
         // 3. Return an array of these string descriptions.
+        if (featureCollection?.Features == null)
+        {
         return [];
+        }
+
+    var earthquakes = new List<string>();
+
+    foreach (var feature in featureCollection.Features)
+        {
+        string place = feature.Properties.Place;
+        string magnitude = feature.Properties.Mag?.ToString() ?? "Unknown";
+
+        earthquakes.Add($"{place} - Mag {magnitude}");
+        }
+
+        return earthquakes.ToArray();
     }
 }
